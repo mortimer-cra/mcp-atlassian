@@ -480,6 +480,168 @@ def hello():
     assert "python" in result
 
 
+def test_process_html_content_with_inline_attachments_disabled():
+    """Test that attachments are not processed when preserve_inline_attachments is False."""
+    from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor
+
+    html_with_image = """
+<p>Here is an image:</p>
+<ac:image>
+    <ri:attachment ri:filename="diagram.png"/>
+</ac:image>
+<p>And a link:</p>
+<ac:link>
+    <ri:attachment ri:filename="document.pdf"/>
+    <ac:link-body>Download PDF</ac:link-body>
+</ac:link>
+"""
+
+    preprocessor = ConfluencePreprocessor(
+        base_url="https://example.atlassian.net",
+        preserve_inline_attachments=False
+    )
+
+    processed_html, processed_markdown = preprocessor.process_html_content(
+        html_with_image,
+        confluence_client=MockConfluenceClient(),
+        page_id="12345"
+    )
+
+    # When disabled, macros should remain unchanged
+    assert "<ac:image>" in processed_html
+    assert "<ri:attachment ri:filename=\"diagram.png\"/>" in processed_html
+    assert "<ac:link>" in processed_html
+    assert "<ri:attachment ri:filename=\"document.pdf\"/>" in processed_html
+
+
+def test_process_html_content_with_inline_attachments_enabled():
+    """Test that attachments are processed when preserve_inline_attachments is True."""
+    from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor
+
+    html_with_image = """
+<p>Here is an image:</p>
+<ac:image>
+    <ri:attachment ri:filename="diagram.png"/>
+</ac:image>
+<p>And a link:</p>
+<ac:link>
+    <ri:attachment ri:filename="document.pdf"/>
+    <ac:link-body>Download PDF</ac:link-body>
+</ac:link>
+<p>Plain attachment reference:</p>
+<ri:attachment ri:filename="readme.txt"/>
+"""
+
+    preprocessor = ConfluencePreprocessor(
+        base_url="https://example.atlassian.net",
+        preserve_inline_attachments=True
+    )
+
+    processed_html, processed_markdown = preprocessor.process_html_content(
+        html_with_image,
+        confluence_client=MockConfluenceClient(),
+        page_id="12345"
+    )
+
+    # Check that ac:image is converted to img tag
+    assert "<img src=\"https://example.atlassian.net/download/attachments/12345/diagram.png\" alt=\"diagram.png\">" in processed_html
+
+    # Check that ac:link with ri:attachment is converted to a tag
+    assert "<a href=\"https://example.atlassian.net/download/attachments/12345/document.pdf\">Download PDF</a>" in processed_html
+
+    # Check that plain ri:attachment is converted to a tag
+    assert "<a href=\"https://example.atlassian.net/download/attachments/12345/readme.txt\">readme.txt</a>" in processed_html
+
+    # Check that original macros are removed
+    assert "<ac:image>" not in processed_html
+    assert "<ac:link>" not in processed_html
+    assert "<ri:attachment" not in processed_html
+
+
+def test_process_html_content_with_attachment_alt_text():
+    """Test that alt text is properly extracted from ac:image parameters."""
+    from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor
+
+    html_with_alt = """
+<ac:image>
+    <ri:attachment ri:filename="chart.png"/>
+    <ac:parameter ac:name="alt">Sales Chart 2024</ac:parameter>
+    <ac:parameter ac:name="title">Monthly Sales</ac:parameter>
+</ac:image>
+"""
+
+    preprocessor = ConfluencePreprocessor(
+        base_url="https://example.atlassian.net",
+        preserve_inline_attachments=True
+    )
+
+    processed_html, processed_markdown = preprocessor.process_html_content(
+        html_with_alt,
+        confluence_client=MockConfluenceClient(),
+        page_id="12345"
+    )
+
+    # Check that alt text is used
+    assert "alt=\"Sales Chart 2024\"" in processed_html
+    assert "<img src=\"https://example.atlassian.net/download/attachments/12345/chart.png\" alt=\"Sales Chart 2024\">" in processed_html
+
+
+def test_process_html_content_with_malformed_attachments():
+    """Test error handling for malformed attachment macros."""
+    from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor
+
+    html_malformed = """
+<ac:image>
+    <ri:attachment/>
+</ac:image>
+<ac:link>
+    <ri:attachment ri:filename=""/>
+    <ac:link-body>Empty filename</ac:link-body>
+</ac:link>
+"""
+
+    preprocessor = ConfluencePreprocessor(
+        base_url="https://example.atlassian.net",
+        preserve_inline_attachments=True
+    )
+
+    # Should not raise exception, should replace with placeholders
+    processed_html, processed_markdown = preprocessor.process_html_content(
+        html_malformed,
+        confluence_client=MockConfluenceClient(),
+        page_id="12345"
+    )
+
+    # Check that malformed attachments are replaced with placeholders
+    assert "[Image attachment]" in processed_html
+    assert "[Attachment link]" in processed_html
+
+
+def test_attachment_url_encoding():
+    """Test that attachment filenames are properly URL encoded."""
+    from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor
+
+    html_with_spaces = """
+<ri:attachment ri:filename="file with spaces.pdf"/>
+<ri:attachment ri:filename="file-with-special-chars:áéíóú.pdf"/>
+"""
+
+    preprocessor = ConfluencePreprocessor(
+        base_url="https://example.atlassian.net",
+        preserve_inline_attachments=True
+    )
+
+    processed_html, processed_markdown = preprocessor.process_html_content(
+        html_with_spaces,
+        confluence_client=MockConfluenceClient(),
+        page_id="12345"
+    )
+
+    # Check that spaces and special characters are URL encoded
+    assert "file%20with%20spaces.pdf" in processed_html
+    assert "file-with-special-chars%3A%C3%A1%C3%A9%C3%AD%C3%B3%C3%BA.pdf" in processed_html
+
+
 def test_markdown_to_confluence_optional_anchor_generation():
     """Test that enable_heading_anchors parameter controls anchor generation."""
     from mcp_atlassian.preprocessing.confluence import ConfluencePreprocessor

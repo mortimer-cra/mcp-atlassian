@@ -85,6 +85,8 @@ class SearchMixin(ConfluenceClient):
                             excerpt,
                             space_key=space_key,
                             confluence_client=self.confluence,
+                            page_id=result_item.get("content", {}).get("id"),
+                            preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
                         )
                         # Create a new page with processed content
                         page.content = processed_markdown

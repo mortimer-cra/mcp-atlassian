@@ -13,7 +13,7 @@ from md2conf.converter import (
     markdown_to_html,
 )
 
-from .base import BasePreprocessor
+from .base import BasePreprocessor, ConfluenceClient
 
 logger = logging.getLogger("mcp-atlassian")
 
@@ -21,14 +21,16 @@ logger = logging.getLogger("mcp-atlassian")
 class ConfluencePreprocessor(BasePreprocessor):
     """Handles text preprocessing for Confluence content."""
 
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, preserve_inline_attachments: bool = False) -> None:
         """
         Initialize the Confluence text preprocessor.
 
         Args:
             base_url: Base URL for Confluence API
+            preserve_inline_attachments: Whether to inline attachments in content (default: False)
         """
         super().__init__(base_url=base_url)
+        self.preserve_inline_attachments = preserve_inline_attachments
 
     def markdown_to_confluence_storage(
         self, markdown_content: str, *, enable_heading_anchors: bool = False
@@ -92,5 +94,40 @@ class ConfluencePreprocessor(BasePreprocessor):
             storage_format = f"""<p>{html_content}</p>"""
 
             return str(storage_format)
+
+    def process_html_content(
+        self,
+        html_content: str,
+        space_key: str = "",
+        confluence_client: ConfluenceClient | None = None,
+        page_id: str | None = None,
+        preserve_inline_attachments: bool | None = None,
+    ) -> tuple[str, str]:
+        """
+        Process HTML content to replace user refs and page links.
+
+        Args:
+            html_content: The HTML content to process
+            space_key: Optional space key for context
+            confluence_client: Optional Confluence client for user lookups
+            page_id: Optional page ID for attachment URL construction
+            preserve_inline_attachments: Whether to inline attachments in content.
+                                      If None, uses the instance setting.
+
+        Returns:
+            Tuple of (processed_html, processed_markdown)
+        """
+        # Use instance setting if not explicitly provided
+        if preserve_inline_attachments is None:
+            preserve_inline_attachments = self.preserve_inline_attachments
+
+        # Call parent method with the preserve_inline_attachments parameter
+        return super().process_html_content(
+            html_content=html_content,
+            space_key=space_key,
+            confluence_client=confluence_client,
+            page_id=page_id,
+            preserve_inline_attachments=preserve_inline_attachments,
+        )
 
     # Confluence-specific methods can be added here

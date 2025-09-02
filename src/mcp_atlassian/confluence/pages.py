@@ -70,7 +70,11 @@ class PagesMixin(ConfluenceClient):
             space_key = page.get("space", {}).get("key", "")
             content = page["body"]["storage"]["value"]
             processed_html, processed_markdown = self.preprocessor.process_html_content(
-                content, space_key=space_key, confluence_client=self.confluence
+                content,
+                space_key=space_key,
+                confluence_client=self.confluence,
+                page_id=page_id,
+                preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
             )
 
             # Use the appropriate content format based on the convert_to_markdown flag
@@ -185,7 +189,11 @@ class PagesMixin(ConfluenceClient):
 
             content = page["body"]["storage"]["value"]
             processed_html, processed_markdown = self.preprocessor.process_html_content(
-                content, space_key=space_key, confluence_client=self.confluence
+                content,
+                space_key=space_key,
+                confluence_client=self.confluence,
+                page_id=page.get("id"),
+                preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
             )
 
             # Use the appropriate content format based on the convert_to_markdown flag
@@ -246,7 +254,11 @@ class PagesMixin(ConfluenceClient):
         for page in pages:
             content = page["body"]["storage"]["value"]
             processed_html, processed_markdown = self.preprocessor.process_html_content(
-                content, space_key=space_key, confluence_client=self.confluence
+                content,
+                space_key=space_key,
+                confluence_client=self.confluence,
+                page_id=page.get("id"),
+                preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
             )
 
             # Use the appropriate content format based on the convert_to_markdown flag
@@ -496,6 +508,8 @@ class PagesMixin(ConfluenceClient):
                             content,
                             space_key=space_key,
                             confluence_client=self.confluence,
+                            page_id=page.get("id"),
+                            preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
                         )
                         content_override = processed_markdown
 

@@ -229,8 +229,13 @@ class ConfluencePage(ApiModel, TimestampMixin):
             url=url,
         )
 
-    def to_simplified_dict(self) -> dict[str, Any]:
-        """Convert to simplified dictionary for API response."""
+    def to_simplified_dict(self, *, hide_attachments: bool = False) -> dict[str, Any]:
+        """Convert to simplified dictionary for API response.
+
+        Args:
+            hide_attachments: If True, don't include attachments list in the output.
+                            This is useful when attachments are already inline in content.
+        """
         result = {
             "id": self.id,
             "title": self.title,
@@ -252,10 +257,11 @@ class ConfluencePage(ApiModel, TimestampMixin):
         if self.version:
             result["version"] = self.version.number
 
-        # Add attachments if available
-        result["attachments"] = [
-            attachment.to_simplified_dict() for attachment in self.attachments
-        ]
+        # Add attachments if available and not hidden
+        if not hide_attachments and self.attachments:
+            result["attachments"] = [
+                attachment.to_simplified_dict() for attachment in self.attachments
+            ]
 
         # Add content if it's not empty
         if self.content and self.content_format:

@@ -121,7 +121,10 @@ class ConfluenceClient:
         # Import here to avoid circular imports
         from ..preprocessing.confluence import ConfluencePreprocessor
 
-        self.preprocessor = ConfluencePreprocessor(base_url=self.config.url)
+        self.preprocessor = ConfluencePreprocessor(
+            base_url=self.config.url,
+            preserve_inline_attachments=self.config.preserve_inline_attachments,
+        )
 
         # Test authentication during initialization (in debug mode only)
         if logger.isEnabledFor(logging.DEBUG):
@@ -173,17 +176,22 @@ class ConfluenceClient:
             logger.debug(f"Applied custom header: {header_name}")
 
     def _process_html_content(
-        self, html_content: str, space_key: str
+        self, html_content: str, space_key: str, page_id: str | None = None
     ) -> tuple[str, str]:
         """Process HTML content into both HTML and markdown formats.
 
         Args:
             html_content: Raw HTML content from Confluence
             space_key: The key of the space containing the content
+            page_id: Optional page ID for attachment processing
 
         Returns:
             Tuple of (processed_html, processed_markdown)
         """
         return self.preprocessor.process_html_content(
-            html_content, space_key, self.confluence
+            html_content,
+            space_key=space_key,
+            confluence_client=self.confluence,
+            page_id=page_id,
+            preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
         )

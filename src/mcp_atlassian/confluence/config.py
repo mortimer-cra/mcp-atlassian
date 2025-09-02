@@ -36,6 +36,7 @@ class ConfluenceConfig:
     no_proxy: str | None = None  # Comma-separated list of hosts to bypass proxy
     socks_proxy: str | None = None  # SOCKS proxy URL (optional)
     custom_headers: dict[str, str] | None = None  # Custom HTTP headers
+    preserve_inline_attachments: bool = False  # Whether to inline attachments in content
 
     @property
     def is_cloud(self) -> bool:
@@ -127,6 +128,9 @@ class ConfluenceConfig:
         # Custom headers - service-specific only
         custom_headers = get_custom_headers("CONFLUENCE_CUSTOM_HEADERS")
 
+        # Preserve inline attachments setting
+        preserve_inline_attachments = os.getenv("CONFLUENCE_PRESERVE_INLINE_ATTACHMENTS", "false").lower() in ("true", "1", "yes", "on")
+
         return cls(
             url=url,
             auth_type=auth_type,
@@ -141,6 +145,7 @@ class ConfluenceConfig:
             no_proxy=no_proxy,
             socks_proxy=socks_proxy,
             custom_headers=custom_headers,
+            preserve_inline_attachments=preserve_inline_attachments,
         )
 
     def is_auth_configured(self) -> bool:

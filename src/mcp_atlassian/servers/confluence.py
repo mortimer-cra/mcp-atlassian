@@ -106,7 +106,9 @@ async def search(
         pages = confluence_fetcher.search(
             query, limit=limit, spaces_filter=spaces_filter
         )
-    search_results = [page.to_simplified_dict() for page in pages]
+    # Check if inline attachments are enabled to hide attachments list
+    hide_attachments = getattr(confluence_fetcher.preprocessor, 'preserve_inline_attachments', False)
+    search_results = [page.to_simplified_dict(hide_attachments=hide_attachments) for page in pages]
     return json.dumps(search_results, indent=2, ensure_ascii=False)
 
 
@@ -219,7 +221,9 @@ async def get_page(
         )
 
     if include_metadata:
-        result = {"metadata": page_object.to_simplified_dict()}
+        # Check if inline attachments are enabled to hide attachments list
+        hide_attachments = getattr(confluence_fetcher.preprocessor, 'preserve_inline_attachments', False)
+        result = {"metadata": page_object.to_simplified_dict(hide_attachments=hide_attachments)}
     else:
         result = {"content": {"value": page_object.content}}
 
@@ -296,7 +300,9 @@ async def get_page_children(
             expand=expand,
             convert_to_markdown=convert_to_markdown,
         )
-        child_pages = [page.to_simplified_dict() for page in pages]
+        # Check if inline attachments are enabled to hide attachments list
+        hide_attachments = getattr(confluence_fetcher.preprocessor, 'preserve_inline_attachments', False)
+        child_pages = [page.to_simplified_dict(hide_attachments=hide_attachments) for page in pages]
         result = {
             "parent_id": parent_id,
             "count": len(child_pages),
@@ -482,7 +488,9 @@ async def create_page(
         else False,
         content_representation=content_representation,
     )
-    result = page.to_simplified_dict()
+    # Check if inline attachments are enabled to hide attachments list
+    hide_attachments = getattr(confluence_fetcher.preprocessor, 'preserve_inline_attachments', False)
+    result = page.to_simplified_dict(hide_attachments=hide_attachments)
     return json.dumps(
         {"message": "Page created successfully", "page": result},
         indent=2,
@@ -576,7 +584,9 @@ async def update_page(
         else False,
         content_representation=content_representation,
     )
-    page_data = updated_page.to_simplified_dict()
+    # Check if inline attachments are enabled to hide attachments list
+    hide_attachments = getattr(confluence_fetcher.preprocessor, 'preserve_inline_attachments', False)
+    page_data = updated_page.to_simplified_dict(hide_attachments=hide_attachments)
     return json.dumps(
         {"message": "Page updated successfully", "page": page_data},
         indent=2,

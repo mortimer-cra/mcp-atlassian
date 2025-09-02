@@ -44,7 +44,11 @@ class CommentsMixin(ConfluenceClient):
                 body = comment_data["body"]["view"]["value"]
                 processed_html, processed_markdown = (
                     self.preprocessor.process_html_content(
-                        body, space_key=space_key, confluence_client=self.confluence
+                        body,
+                        space_key=space_key,
+                        confluence_client=self.confluence,
+                        page_id=page_id,
+                        preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
                     )
                 )
 
@@ -120,6 +124,8 @@ class CommentsMixin(ConfluenceClient):
                 response.get("body", {}).get("view", {}).get("value", ""),
                 space_key=space_key,
                 confluence_client=self.confluence,
+                page_id=page_id,
+                preserve_inline_attachments=self.preprocessor.preserve_inline_attachments,
             )
 
             # Modify the response to include processed content
