@@ -14,6 +14,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from mcp_atlassian.confluence import ConfluenceFetcher
 from mcp_atlassian.confluence.config import ConfluenceConfig
@@ -24,11 +26,26 @@ from mcp_atlassian.utils.io import is_read_only_mode
 from mcp_atlassian.utils.logging import mask_sensitive
 from mcp_atlassian.utils.tools import get_enabled_tools, should_include_tool
 
-from .confluence import confluence_mcp
+from .confluence import confluence_mcp, search, get_page
 from .context import MainAppContext
 from .jira import jira_mcp
 
 logger = logging.getLogger("mcp-atlassian.server.main")
+
+
+# Pydantic models for REST API requests
+class ConfluenceSearchRequest(BaseModel):
+    query: str = Field(..., description="Search query - can be simple text or CQL")
+    limit: int = Field(10, ge=1, le=50, description="Maximum number of results (1-50)")
+    spaces_filter: Optional[str] = Field(None, description="Comma-separated list of space keys to filter by")
+
+
+class ConfluenceGetPageRequest(BaseModel):
+    page_id: Optional[str] = Field(None, description="Confluence page ID")
+    title: Optional[str] = Field(None, description="Page title")
+    space_key: Optional[str] = Field(None, description="Space key")
+    include_metadata: bool = Field(True, description="Include page metadata")
+    convert_to_markdown: bool = Field(True, description="Convert to markdown")
 
 
 async def health_check(request: Request) -> JSONResponse:
@@ -335,4 +352,173 @@ async def _health_check_route(request: Request) -> JSONResponse:
     return await health_check(request)
 
 
+@main_mcp.custom_route("/api/confluence/search", methods=["POST"])
+async def api_confluence_search(request: Request) -> JSONResponse:
+    """REST API endpoint for Confluence search functionality."""
+    try:
+        # Parse request body
+        data = await request.json()
+        search_request = ConfluenceSearchRequest(**data)
+
+        # Create app context from environment
+        from mcp_atlassian.confluence.config import ConfluenceConfig
+        from mcp_atlassian.jira.config import JiraConfig
+        from mcp_atlassian.utils.environment import get_available_services
+        from mcp_atlassian.utils.io import is_read_only_mode
+        from mcp_atlassian.utils.tools import get_enabled_tools
+
+        services = get_available_services()
+        read_only = is_read_only_mode()
+        enabled_tools = get_enabled_tools()
+
+        loaded_jira_config = None
+        loaded_confluence_config = None
+
+        if services.get("jira"):
+            try:
+                loaded_jira_config = JiraConfig.from_env()
+            except:
+                pass
+
+        if services.get("confluence"):
+            try:
+                loaded_confluence_config = ConfluenceConfig.from_env()
+            except:
+                pass
+
+        app_context = MainAppContext(
+            full_jira_config=loaded_jira_config,
+            full_confluence_config=loaded_confluence_config,
+            read_only=read_only,
+            enabled_tools=enabled_tools,
+        )
+
+        # Create a mock context for the MCP tool
+        from fastmcp import Context
+        mock_request_context = type('MockRequestContext', (), {
+            'lifespan_context': {"app_lifespan_context": app_context},
+            'request': request
+        })()
+        ctx = Context(fastmcp=main_mcp)
+        # Try to set request_context, if it fails, we'll handle it differently
+        try:
+            ctx.request_context = mock_request_context
+        except AttributeError:
+            # If we can't set request_context, we'll need to find another way
+            # For now, let's create a custom context class
+            class MockContext:
+                def __init__(self, fastmcp, request_context):
+                    self._fastmcp = fastmcp
+                    self._request_context = request_context
+
+                @property
+                def request_context(self):
+                    return self._request_context
+
+            ctx = MockContext(main_mcp, mock_request_context)
+
+        # Call the MCP search tool
+        result = await search(
+            ctx=ctx,
+            query=search_request.query,
+            limit=search_request.limit,
+            spaces_filter=search_request.spaces_filter,
+        )
+
+        return JSONResponse({"success": True, "data": result})
+
+    except Exception as e:
+        logger.error(f"Error in confluence search API: {e}")
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+@main_mcp.custom_route("/api/confluence/get_page", methods=["POST"])
+async def api_confluence_get_page(request: Request) -> JSONResponse:
+    """REST API endpoint for Confluence get page functionality."""
+    try:
+        # Parse request body
+        data = await request.json()
+        get_page_request = ConfluenceGetPageRequest(**data)
+
+        # Create app context from environment
+        from mcp_atlassian.confluence.config import ConfluenceConfig
+        from mcp_atlassian.jira.config import JiraConfig
+        from mcp_atlassian.utils.environment import get_available_services
+        from mcp_atlassian.utils.io import is_read_only_mode
+        from mcp_atlassian.utils.tools import get_enabled_tools
+
+        services = get_available_services()
+        read_only = is_read_only_mode()
+        enabled_tools = get_enabled_tools()
+
+        loaded_jira_config = None
+        loaded_confluence_config = None
+
+        if services.get("jira"):
+            try:
+                loaded_jira_config = JiraConfig.from_env()
+            except:
+                pass
+
+        if services.get("confluence"):
+            try:
+                loaded_confluence_config = ConfluenceConfig.from_env()
+            except:
+                pass
+
+        app_context = MainAppContext(
+            full_jira_config=loaded_jira_config,
+            full_confluence_config=loaded_confluence_config,
+            read_only=read_only,
+            enabled_tools=enabled_tools,
+        )
+
+        # Create a mock context for the MCP tool
+        from fastmcp import Context
+        mock_request_context = type('MockRequestContext', (), {
+            'lifespan_context': {"app_lifespan_context": app_context},
+            'request': request
+        })()
+        ctx = Context(fastmcp=main_mcp)
+        # Try to set request_context, if it fails, we'll handle it differently
+        try:
+            ctx.request_context = mock_request_context
+        except AttributeError:
+            # If we can't set request_context, we'll need to find another way
+            # For now, let's create a custom context class
+            class MockContext:
+                def __init__(self, fastmcp, request_context):
+                    self._fastmcp = fastmcp
+                    self._request_context = request_context
+
+                @property
+                def request_context(self):
+                    return self._request_context
+
+            ctx = MockContext(main_mcp, mock_request_context)
+
+        # Call the MCP get_page tool
+        result = await get_page(
+            ctx=ctx,
+            page_id=get_page_request.page_id,
+            title=get_page_request.title,
+            space_key=get_page_request.space_key,
+            include_metadata=get_page_request.include_metadata,
+            convert_to_markdown=get_page_request.convert_to_markdown,
+        )
+
+        return JSONResponse({"success": True, "data": result})
+
+    except Exception as e:
+        logger.error(f"Error in confluence get_page API: {e}")
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
 logger.info("Added /healthz endpoint for Kubernetes probes")
+logger.info("Added REST API endpoints: /api/confluence/search and /api/confluence/get_page")

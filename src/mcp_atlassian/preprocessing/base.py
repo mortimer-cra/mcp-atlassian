@@ -57,6 +57,9 @@ class BasePreprocessor:
             Tuple of (processed_html, processed_markdown)
         """
         try:
+            # Remove Confluence search highlighting markers
+            html_content = self._remove_confluence_highlight_markers(html_content)
+
             # Parse the HTML content
             soup = BeautifulSoup(html_content, "html.parser")
 
@@ -417,6 +420,22 @@ class BasePreprocessor:
         download_url = f"http://{proxy_host}:{proxy_port}{proxy_base_path}/confluence/attachment/{page_id}/{encoded_filename}"
         logger.debug(f"Using proxy URL for attachment: {download_url}")
         return download_url
+
+    def _remove_confluence_highlight_markers(self, html_content: str) -> str:
+        """
+        Remove Confluence search highlighting markers from HTML content.
+
+        Args:
+            html_content: HTML content containing highlight markers
+
+        Returns:
+            HTML content with highlight markers removed
+        """
+        # Remove highlight start markers
+        html_content = re.sub(r'@@@hl@@@', '', html_content)
+        # Remove highlight end markers
+        html_content = re.sub(r'@@@endhl@@@', '', html_content)
+        return html_content
 
     def _convert_html_to_markdown(self, text: str) -> str:
         """Convert HTML content to markdown if needed."""
