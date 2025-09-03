@@ -394,6 +394,7 @@ class BasePreprocessor:
     ) -> str:
         """
         Construct attachment download URL.
+        Always uses proxy URLs with configured or default settings.
 
         Args:
             base_url: Base URL of Confluence instance
@@ -407,10 +408,14 @@ class BasePreprocessor:
         from urllib.parse import quote
         encoded_filename = quote(filename)
 
-        # Construct download URL
-        # Format: {base_url}/download/attachments/{pageId}/{filename}
-        download_url = f"{base_url}/download/attachments/{page_id}/{encoded_filename}"
+        # Use configured proxy settings or defaults
+        proxy_host = getattr(self, 'proxy_host', None) or "localhost"
+        proxy_port = getattr(self, 'proxy_port', None) or 8002
+        proxy_base_path = getattr(self, 'proxy_base_path', None) or "/proxy"
 
+        # Always use proxy URL format: http://localhost:8002/proxy/confluence/attachment/{pageId}/{filename}
+        download_url = f"http://{proxy_host}:{proxy_port}{proxy_base_path}/confluence/attachment/{page_id}/{encoded_filename}"
+        logger.debug(f"Using proxy URL for attachment: {download_url}")
         return download_url
 
     def _convert_html_to_markdown(self, text: str) -> str:

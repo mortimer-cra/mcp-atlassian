@@ -21,16 +21,29 @@ logger = logging.getLogger("mcp-atlassian")
 class ConfluencePreprocessor(BasePreprocessor):
     """Handles text preprocessing for Confluence content."""
 
-    def __init__(self, base_url: str, preserve_inline_attachments: bool = False) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        preserve_inline_attachments: bool = False,
+        proxy_host: str | None = None,
+        proxy_port: int | None = None,
+        proxy_base_path: str | None = None,
+    ) -> None:
         """
         Initialize the Confluence text preprocessor.
 
         Args:
             base_url: Base URL for Confluence API
             preserve_inline_attachments: Whether to inline attachments in content (default: False)
+            proxy_host: Proxy host for attachment URLs
+            proxy_port: Proxy port for attachment URLs
+            proxy_base_path: Proxy base path for attachment URLs
         """
         super().__init__(base_url=base_url)
         self.preserve_inline_attachments = preserve_inline_attachments
+        self.proxy_host = proxy_host
+        self.proxy_port = proxy_port
+        self.proxy_base_path = proxy_base_path
 
     def markdown_to_confluence_storage(
         self, markdown_content: str, *, enable_heading_anchors: bool = False
@@ -122,12 +135,16 @@ class ConfluencePreprocessor(BasePreprocessor):
             preserve_inline_attachments = self.preserve_inline_attachments
 
         # Call parent method with the preserve_inline_attachments parameter
-        return super().process_html_content(
+        processed_html, processed_markdown = super().process_html_content(
             html_content=html_content,
             space_key=space_key,
             confluence_client=confluence_client,
             page_id=page_id,
             preserve_inline_attachments=preserve_inline_attachments,
         )
+
+        # Only process attachments, no external links
+
+        return processed_html, processed_markdown
 
     # Confluence-specific methods can be added here

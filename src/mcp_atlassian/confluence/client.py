@@ -124,6 +124,9 @@ class ConfluenceClient:
         self.preprocessor = ConfluencePreprocessor(
             base_url=self.config.url,
             preserve_inline_attachments=self.config.preserve_inline_attachments,
+            proxy_host=self.config.proxy_host,
+            proxy_port=self.config.proxy_port,
+            proxy_base_path=self.config.proxy_base_path,
         )
 
         # Test authentication during initialization (in debug mode only)

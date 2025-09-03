@@ -190,6 +190,43 @@ async def get_confluence_page_with_proxy_links(page_id: str, request: Request):
         raise HTTPException(status_code=500, detail="内部服务器错误")
 
 
+@app.get(f"{PROXY_BASE_PATH}/general/{{path:path}}")
+async def proxy_general(path: str):
+    """代理通用 URL"""
+    try:
+        # 解码 URL
+        from urllib.parse import unquote, urlparse
+        url = unquote(path)
+
+        # 验证 URL
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise HTTPException(status_code=400, detail="无效的 URL")
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                content = await response.read()
+
+                # 返回内容，保留原始头部
+                response_headers = {
+                    "Content-Type": response.headers.get("Content-Type", "application/octet-stream"),
+                    "Cache-Control": "public, max-age=3600"
+                }
+
+                return Response(
+                    content=content,
+                    headers=response_headers,
+                    status_code=response.status
+                )
+
+    except aiohttp.ClientError as e:
+        logger.error(f"网络错误代理 URL {path}: {e}")
+        raise HTTPException(status_code=502, detail="代理失败")
+    except Exception as e:
+        logger.error(f"意外错误代理 URL {path}: {e}")
+        raise HTTPException(status_code=500, detail="内部服务器错误")
+
+
 def replace_attachment_links(content: str, page_id: str, proxy_base_url: str, confluence_base_url: str, attachments: list) -> str:
     """替换内容中的附件链接为代理链接"""
 
